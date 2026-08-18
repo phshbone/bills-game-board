@@ -16,8 +16,8 @@ const modules = [
     categoryTitle: "bill's puzzles",
     route: '/puzzles/crossword',
     mascot: 'puzzle-bill.svg',
-    status: 'placeholder',
-    capabilities: ['navigation']
+    status: 'playable',
+    capabilities: ['navigation', 'local-state', 'grid-input', 'hints']
   },
   {
     id: 'puzzles-word-search',
