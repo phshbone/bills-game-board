@@ -18,7 +18,10 @@ const requiredFiles = [
   'src/core/storage.js',
   'src/core/triviaEngine.js',
   'src/data/trivia.js',
-  'src/pages/Brain/Trivia.jsx'
+  'src/pages/Brain/Trivia.jsx',
+  'src/core/crosswordEngine.js',
+  'src/data/crossword.js',
+  'src/pages/Puzzles/Crossword.jsx'
 ]
 
 const requiredRoutes = [
@@ -76,5 +79,17 @@ if (!triviaPage.includes('buildTriviaRound') || !triviaPage.includes('bestPercen
   failed = true
 }
 
+const crosswordData = await readFile(path.join(root, 'src/data/crossword.js'), 'utf8')
+if (!crosswordData.includes("id: 'starter-mini-1'") || !crosswordData.includes("'CAT#DOG'")) {
+  console.error('CROSSWORD STARTER DATA INVALID')
+  failed = true
+}
+
+const crosswordPage = await readFile(path.join(root, 'src/pages/Puzzles/Crossword.jsx'), 'utf8')
+if (!crosswordPage.includes('buildCrossword') || !crosswordPage.includes('Hint cell') || !crosswordPage.includes('Across / Down')) {
+  console.error('CROSSWORD FOUNDATION FLOW INVALID')
+  failed = true
+}
+
 if (failed) process.exit(1)
-console.log('Sprint shell and Trivia v1 checks passed.')
+console.log('Sprint shell, Trivia v1, and Crossword foundation checks passed.')
