@@ -6,8 +6,8 @@ const modules = [
     categoryTitle: "bill's brain",
     route: '/brain/trivia',
     mascot: 'big-brain-bill.svg',
-    status: 'placeholder',
-    capabilities: ['navigation']
+    status: 'playable',
+    capabilities: ['navigation', 'local-state', 'scoring']
   },
   {
     id: 'puzzles-crossword',
