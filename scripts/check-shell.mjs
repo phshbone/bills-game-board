@@ -15,7 +15,10 @@ const requiredFiles = [
   'src/routes/AppRoutes.jsx',
   'src/core/buildInfo.js',
   'src/core/moduleRegistry.js',
-  'src/core/storage.js'
+  'src/core/storage.js',
+  'src/core/triviaEngine.js',
+  'src/data/trivia.js',
+  'src/pages/Brain/Trivia.jsx'
 ]
 
 const requiredRoutes = [
@@ -61,5 +64,17 @@ if (manifest.display !== 'standalone' || manifest.theme_color !== '#090f2b') {
   failed = true
 }
 
+const triviaData = await readFile(path.join(root, 'src/data/trivia.js'), 'utf8')
+if (!triviaData.includes("pack: 'core'") || !triviaData.includes("difficulty: 'Easy'") || !triviaData.includes("difficulty: 'Hard'")) {
+  console.error('TRIVIA STARTER PACK CONTRACT INVALID')
+  failed = true
+}
+
+const triviaPage = await readFile(path.join(root, 'src/pages/Brain/Trivia.jsx'), 'utf8')
+if (!triviaPage.includes('buildTriviaRound') || !triviaPage.includes('bestPercent') || !triviaPage.includes('Start round')) {
+  console.error('TRIVIA V1 FLOW INVALID')
+  failed = true
+}
+
 if (failed) process.exit(1)
-console.log('Sprint 1 shell checks passed.')
+console.log('Sprint shell and Trivia v1 checks passed.')
