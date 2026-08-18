@@ -30,10 +30,9 @@ export default function Trivia() {
     if (!answered) return
 
     if (index === questions.length - 1) {
-      const finalScore = score + (selected === current.answer ? 1 : 0)
       const nextStats = {
         gamesPlayed: stats.gamesPlayed + 1,
-        bestScore: Math.max(stats.bestScore, finalScore)
+        bestScore: Math.max(stats.bestScore, score)
       }
       storage.set(STATS_KEY, nextStats)
       setStats(nextStats)
