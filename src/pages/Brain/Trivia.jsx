@@ -89,7 +89,7 @@ export default function Trivia() {
           <p className="text-xs font-black uppercase tracking-[0.18em] text-billred">bill's brain</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-navy">Trivia</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-            Pick a category and difficulty, or leave either one on All for a mixed five-question round.
+            Pick a category and difficulty, or leave either one on All for a mixed round of up to five questions.
           </p>
 
           <div className="mt-7 grid gap-5 sm:grid-cols-2">
