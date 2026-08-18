@@ -20,6 +20,32 @@ function shuffle(items) {
   return shuffled
 }
 
+function answerPositions(size) {
+  const positions = []
+  while (positions.length < size) {
+    positions.push(...shuffle([0, 1, 2, 3]))
+  }
+  return positions.slice(0, size)
+}
+
+function randomizeChoices(question, targetAnswerIndex) {
+  const correctChoice = question.choices[question.answer]
+  const distractors = shuffle(question.choices.filter((_, index) => index !== question.answer))
+  const choices = [...distractors]
+  choices.splice(targetAnswerIndex, 0, correctChoice)
+
+  return {
+    ...question,
+    choices,
+    answer: targetAnswerIndex
+  }
+}
+
+function prepareRound(questions) {
+  const positions = answerPositions(questions.length)
+  return questions.map((question, index) => randomizeChoices(question, positions[index]))
+}
+
 export function recentQuestionIds(roundHistory, windowSize = TRIVIA_REPEAT_WINDOW) {
   return new Set((roundHistory ?? []).slice(-windowSize).flat())
 }
@@ -49,13 +75,21 @@ export function buildTriviaRound(
   const fresh = shuffle(pool.filter((item) => !recentIds.has(item.id)))
   const needed = Math.min(size, pool.length)
 
-  if (fresh.length >= needed) return fresh.slice(0, needed)
+  let selected
+  if (fresh.length >= needed) {
+    selected = fresh.slice(0, needed)
+  } else {
+    // Repeat protection is best-effort while a selected pool is still small.
+    // If the exact filter runs out of fresh questions, recycle only within that
+    // filter rather than changing what the player asked to play.
+    const recycled = shuffle(pool.filter((item) => !fresh.some((freshItem) => freshItem.id === item.id)))
+    selected = [...fresh, ...recycled].slice(0, needed)
+  }
 
-  // Repeat protection is best-effort while the starter bank is still small.
-  // If a narrow category/difficulty pool runs out of fresh questions, recycle
-  // the oldest eligible material rather than changing the user's filters.
-  const recycled = shuffle(pool.filter((item) => !fresh.some((freshItem) => freshItem.id === item.id)))
-  return [...fresh, ...recycled].slice(0, needed)
+  // Choice order is randomized every round. For a normal five-question round,
+  // the correct answers are deliberately spread across A/B/C/D so players
+  // cannot learn a positional pattern from the question data.
+  return prepareRound(selected)
 }
 
 export function scorePercent(score, total) {
