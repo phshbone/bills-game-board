@@ -2,41 +2,71 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import triviaQuestions from '../../data/trivia'
 import { storage } from '../../core/storage'
+import {
+  buildTriviaRound,
+  scorePercent,
+  triviaCategories,
+  triviaDifficulties,
+  TRIVIA_ROUND_SIZE
+} from '../../core/triviaEngine'
 
 const STATS_KEY = 'trivia:stats'
 
 function readStats() {
-  return storage.get(STATS_KEY, { gamesPlayed: 0, bestScore: 0 })
+  const saved = storage.get(STATS_KEY, {})
+  return {
+    gamesPlayed: Number(saved.gamesPlayed) || 0,
+    bestPercent: Number(saved.bestPercent) || 0
+  }
 }
 
 export default function Trivia() {
-  const questions = useMemo(() => triviaQuestions, [])
+  const categories = useMemo(() => triviaCategories(triviaQuestions), [])
+  const difficulties = useMemo(() => triviaDifficulties(triviaQuestions), [])
+  const [category, setCategory] = useState('All')
+  const [difficulty, setDifficulty] = useState('All')
+  const [round, setRound] = useState([])
   const [index, setIndex] = useState(0)
   const [score, setScore] = useState(0)
   const [selected, setSelected] = useState(null)
-  const [finished, setFinished] = useState(false)
+  const [phase, setPhase] = useState('setup')
   const [stats, setStats] = useState(readStats)
 
-  const current = questions[index]
+  const current = round[index]
   const answered = selected !== null
 
+  function startRound() {
+    const nextRound = buildTriviaRound(triviaQuestions, {
+      category,
+      difficulty,
+      size: TRIVIA_ROUND_SIZE
+    })
+
+    setRound(nextRound)
+    setIndex(0)
+    setScore(0)
+    setSelected(null)
+    setPhase('playing')
+  }
+
   function chooseAnswer(choiceIndex) {
-    if (answered || finished) return
+    if (answered || phase !== 'playing') return
     setSelected(choiceIndex)
     if (choiceIndex === current.answer) setScore((value) => value + 1)
   }
 
   function advance() {
-    if (!answered) return
+    if (!answered || phase !== 'playing') return
 
-    if (index === questions.length - 1) {
+    if (index === round.length - 1) {
+      const percent = scorePercent(score, round.length)
       const nextStats = {
         gamesPlayed: stats.gamesPlayed + 1,
-        bestScore: Math.max(stats.bestScore, score)
+        bestPercent: Math.max(stats.bestPercent, percent)
       }
       storage.set(STATS_KEY, nextStats)
       setStats(nextStats)
-      setFinished(true)
+      setPhase('finished')
       return
     }
 
@@ -44,24 +74,83 @@ export default function Trivia() {
     setSelected(null)
   }
 
-  function restart() {
+  function newRound() {
+    setRound([])
     setIndex(0)
     setScore(0)
     setSelected(null)
-    setFinished(false)
+    setPhase('setup')
   }
 
-  if (finished) {
+  if (phase === 'setup') {
+    return (
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:py-10">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-billred">bill's brain</p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-navy">Trivia</h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+            Pick a category and difficulty, or leave either one on All for a mixed five-question round.
+          </p>
+
+          <div className="mt-7 grid gap-5 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-black text-navy">
+              Category
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-navy"
+              >
+                <option>All</option>
+                {categories.map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </label>
+
+            <label className="grid gap-2 text-sm font-black text-navy">
+              Difficulty
+              <select
+                value={difficulty}
+                onChange={(event) => setDifficulty(event.target.value)}
+                className="min-h-12 rounded-2xl border border-slate-300 bg-white px-4 text-base font-bold text-navy"
+              >
+                <option>All</option>
+                {difficulties.map((item) => <option key={item}>{item}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+            <span className="font-black text-navy">Core starter pack:</span> {triviaQuestions.length} questions. The data format already includes a pack field so future themed question packs can plug into the same game.
+          </div>
+
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Link to="/" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 px-5 text-sm font-black text-navy">Back to game board</Link>
+            <button type="button" onClick={startRound} className="min-h-12 rounded-2xl bg-billred px-7 text-sm font-black text-white">Start round</button>
+          </div>
+
+          {stats.gamesPlayed > 0 && (
+            <p className="mt-5 text-center text-xs font-bold text-slate-500">Best: {stats.bestPercent}% · Rounds played: {stats.gamesPlayed}</p>
+          )}
+        </section>
+      </main>
+    )
+  }
+
+  if (phase === 'finished') {
+    const percent = scorePercent(score, round.length)
+
     return (
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:py-10">
         <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-billred">bill's brain</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-navy">Round complete</h1>
-          <p className="mt-5 text-5xl font-black text-navy">{score}/{questions.length}</p>
-          <p className="mt-3 text-sm text-slate-600">Best score: {stats.bestScore}/{questions.length} · Games played: {stats.gamesPlayed}</p>
+          <p className="mt-5 text-5xl font-black text-navy">{score}/{round.length}</p>
+          <p className="mt-2 text-xl font-black text-billred">{percent}%</p>
+          <p className="mt-3 text-sm text-slate-600">Best: {stats.bestPercent}% · Rounds played: {stats.gamesPlayed}</p>
+          <p className="mt-1 text-xs font-bold text-slate-500">{category} · {difficulty}</p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <button onClick={restart} className="min-h-12 rounded-2xl bg-billred px-6 text-sm font-black text-white">Play again</button>
-            <Link to="/" className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-navy px-6 text-sm font-black text-white">Back to game board</Link>
+            <button type="button" onClick={startRound} className="min-h-12 rounded-2xl bg-billred px-6 text-sm font-black text-white">Play another</button>
+            <button type="button" onClick={newRound} className="min-h-12 rounded-2xl border border-slate-200 px-6 text-sm font-black text-navy">Change setup</button>
+            <Link to="/" className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-navy px-6 text-sm font-black text-white">Game board</Link>
           </div>
         </section>
       </main>
@@ -74,17 +163,21 @@ export default function Trivia() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-billred">bill's brain · Trivia</p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-navy">Question {index + 1} of {questions.length}</h1>
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-navy">Question {index + 1} of {round.length}</h1>
           </div>
           <div className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-black text-navy">Score {score}</div>
         </div>
 
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
-          <div className="h-full rounded-full bg-billred transition-all" style={{ width: `${((index + 1) / questions.length) * 100}%` }} />
+          <div className="h-full rounded-full bg-billred transition-all" style={{ width: `${((index + 1) / round.length) * 100}%` }} />
         </div>
 
         <div className="mt-6 rounded-3xl bg-slate-50 p-5 sm:p-6">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{current.category}</p>
+          <div className="flex flex-wrap gap-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+            <span>{current.category}</span>
+            <span aria-hidden="true">·</span>
+            <span>{current.difficulty}</span>
+          </div>
           <h2 className="mt-2 text-xl font-black leading-snug text-navy sm:text-2xl">{current.question}</h2>
         </div>
 
@@ -118,7 +211,7 @@ export default function Trivia() {
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link to="/" className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 px-5 text-sm font-black text-navy">Back to game board</Link>
           <button type="button" onClick={advance} disabled={!answered} className="min-h-12 rounded-2xl bg-navy px-6 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">
-            {index === questions.length - 1 ? 'See score' : 'Next question'}
+            {index === round.length - 1 ? 'See score' : 'Next question'}
           </button>
         </div>
       </section>
