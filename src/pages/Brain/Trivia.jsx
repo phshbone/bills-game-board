@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import triviaQuestions from '../../data/trivia'
 import { storage } from '../../core/storage'
+import { playTriviaSfx } from '../../core/triviaAudio'
 import {
   buildTriviaRound,
+  rememberRound,
   scorePercent,
   triviaCategories,
   triviaDifficulties,
@@ -11,12 +13,22 @@ import {
 } from '../../core/triviaEngine'
 
 const STATS_KEY = 'trivia:stats'
+const HISTORY_KEY = 'trivia:round-history'
+const AUDIO_KEY = 'trivia:audio'
 
 function readStats() {
   const saved = storage.get(STATS_KEY, {})
   return {
     gamesPlayed: Number(saved.gamesPlayed) || 0,
     bestPercent: Number(saved.bestPercent) || 0
+  }
+}
+
+function readAudioPrefs() {
+  const saved = storage.get(AUDIO_KEY, {})
+  return {
+    sfx: saved.sfx !== false,
+    hostVoice: saved.hostVoice === true
   }
 }
 
@@ -31,28 +43,42 @@ export default function Trivia() {
   const [selected, setSelected] = useState(null)
   const [phase, setPhase] = useState('setup')
   const [stats, setStats] = useState(readStats)
+  const [audioPrefs, setAudioPrefs] = useState(readAudioPrefs)
 
   const current = round[index]
   const answered = selected !== null
 
+  function setSfx(enabled) {
+    const next = { ...audioPrefs, sfx: enabled }
+    setAudioPrefs(next)
+    storage.set(AUDIO_KEY, next)
+    if (enabled) playTriviaSfx('correct', true)
+  }
+
   function startRound() {
+    const roundHistory = storage.get(HISTORY_KEY, [])
     const nextRound = buildTriviaRound(triviaQuestions, {
       category,
       difficulty,
-      size: TRIVIA_ROUND_SIZE
+      size: TRIVIA_ROUND_SIZE,
+      roundHistory
     })
 
+    storage.set(HISTORY_KEY, rememberRound(roundHistory, nextRound))
     setRound(nextRound)
     setIndex(0)
     setScore(0)
     setSelected(null)
     setPhase('playing')
+    playTriviaSfx('start', audioPrefs.sfx)
   }
 
   function chooseAnswer(choiceIndex) {
     if (answered || phase !== 'playing') return
+    const correct = choiceIndex === current.answer
     setSelected(choiceIndex)
-    if (choiceIndex === current.answer) setScore((value) => value + 1)
+    if (correct) setScore((value) => value + 1)
+    playTriviaSfx(correct ? 'correct' : 'wrong', audioPrefs.sfx)
   }
 
   function advance() {
@@ -67,6 +93,7 @@ export default function Trivia() {
       storage.set(STATS_KEY, nextStats)
       setStats(nextStats)
       setPhase('finished')
+      playTriviaSfx('finish', audioPrefs.sfx)
       return
     }
 
@@ -89,7 +116,7 @@ export default function Trivia() {
           <p className="text-xs font-black uppercase tracking-[0.18em] text-billred">bill's brain</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-navy">Trivia</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-            Pick a category and difficulty, or leave either one on All for a mixed round of up to five questions.
+            Pick a category and difficulty, or leave either one on All for a mixed five-question round.
           </p>
 
           <div className="mt-7 grid gap-5 sm:grid-cols-2">
@@ -119,7 +146,24 @@ export default function Trivia() {
           </div>
 
           <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-            <span className="font-black text-navy">Core starter pack:</span> {triviaQuestions.length} questions. The data format already includes a pack field so future themed question packs can plug into the same game.
+            <p><span className="font-black text-navy">Core starter pack:</span> {triviaQuestions.length} questions, with enough material for a five-question round in every current category/difficulty combination.</p>
+            <p className="mt-2">The game remembers the last five rounds and avoids recently seen questions whenever the selected pool has fresh material available.</p>
+          </div>
+
+          <div className="mt-5 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+            <label className="flex min-h-11 items-center justify-between gap-4 text-sm font-black text-navy">
+              <span>Game-show sounds</span>
+              <input
+                type="checkbox"
+                checked={audioPrefs.sfx}
+                onChange={(event) => setSfx(event.target.checked)}
+                className="h-5 w-5 accent-[#d62828]"
+              />
+            </label>
+            <label className="flex min-h-11 items-center justify-between gap-4 text-sm font-black text-slate-400">
+              <span>Bill host voice <span className="block text-[11px] font-bold">ready when recordings are added</span></span>
+              <input type="checkbox" checked={audioPrefs.hostVoice} disabled className="h-5 w-5" />
+            </label>
           </div>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
