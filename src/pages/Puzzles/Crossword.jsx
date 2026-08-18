@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 const ROWS = ['BALL', 'AREA', 'LEAD', 'LADY']
@@ -18,17 +18,60 @@ export default function Crossword() {
   const [active, setActive] = useState({ row: 0, col: 0 })
   const [direction, setDirection] = useState('across')
   const [checked, setChecked] = useState(false)
+  const inputRefs = useRef({})
 
   const answerFor = (row, col) => ROWS[row][col]
   const isComplete = ROWS.every((row, rowIndex) =>
     row.split('').every((answer, colIndex) => letters[cellKey(rowIndex, colIndex)] === answer)
   )
 
+  function focusCell(row, col) {
+    const key = cellKey(row, col)
+    requestAnimationFrame(() => inputRefs.current[key]?.focus())
+  }
+
+  function nextCell(row, col) {
+    if (direction === 'across' && col < ROWS[row].length - 1) return { row, col: col + 1 }
+    if (direction === 'down' && row < ROWS.length - 1) return { row: row + 1, col }
+    return null
+  }
+
+  function previousCell(row, col) {
+    if (direction === 'across' && col > 0) return { row, col: col - 1 }
+    if (direction === 'down' && row > 0) return { row: row - 1, col }
+    return null
+  }
+
   function enterLetter(row, col, value) {
     const clean = value.toUpperCase().replace(/[^A-Z]/g, '').slice(-1)
     setLetters((current) => ({ ...current, [cellKey(row, col)]: clean }))
-    setActive({ row, col })
     setChecked(false)
+
+    if (!clean) {
+      setActive({ row, col })
+      return
+    }
+
+    const next = nextCell(row, col)
+    if (next) {
+      setActive(next)
+      focusCell(next.row, next.col)
+    } else {
+      setActive({ row, col })
+    }
+  }
+
+  function handleKeyDown(event, row, col) {
+    if (event.key !== 'Backspace' || letters[cellKey(row, col)]) return
+    const previous = previousCell(row, col)
+    if (!previous) return
+
+    event.preventDefault()
+    const previousKey = cellKey(previous.row, previous.col)
+    setLetters((current) => ({ ...current, [previousKey]: '' }))
+    setActive(previous)
+    setChecked(false)
+    focusCell(previous.row, previous.col)
   }
 
   function hintCell() {
@@ -44,6 +87,7 @@ export default function Crossword() {
     setActive({ row: 0, col: 0 })
     setDirection('across')
     setChecked(false)
+    focusCell(0, 0)
   }
 
   const activeClueIndex = direction === 'across' ? active.row : active.col
@@ -77,9 +121,11 @@ export default function Crossword() {
                   <label key={key} className={`relative border border-slate-400 ${selected ? 'bg-amber-200' : highlighted ? 'bg-amber-50' : 'bg-white'} ${wrong ? 'ring-2 ring-inset ring-billred' : ''}`}>
                     <span className="absolute left-1 top-0.5 text-[10px] font-black text-slate-500">{rowIndex === 0 || colIndex === 0 ? (direction === 'across' ? rowIndex + 1 : colIndex + 1) : ''}</span>
                     <input
+                      ref={(node) => { if (node) inputRefs.current[key] = node }}
                       value={letters[key] || ''}
                       onFocus={() => setActive({ row: rowIndex, col: colIndex })}
                       onChange={(event) => enterLetter(rowIndex, colIndex, event.target.value)}
+                      onKeyDown={(event) => handleKeyDown(event, rowIndex, colIndex)}
                       inputMode="text"
                       autoCapitalize="characters"
                       autoComplete="off"
@@ -113,14 +159,14 @@ export default function Crossword() {
           <h2 className="text-lg font-black text-navy">Across</h2>
           <div className="mt-2 grid gap-2">
             {CLUES.map((clue, index) => (
-              <button key={`a-${index}`} type="button" onClick={() => { setDirection('across'); setActive({ row: index, col: 0 }) }} className={`rounded-xl px-3 py-2 text-left text-sm leading-5 ${direction === 'across' && active.row === index ? 'bg-amber-100 font-black text-navy' : 'text-slate-700'}`}><span className="mr-2 font-black">{index + 1}.</span>{clue}</button>
+              <button key={`a-${index}`} type="button" onClick={() => { setDirection('across'); setActive({ row: index, col: 0 }); focusCell(index, 0) }} className={`rounded-xl px-3 py-2 text-left text-sm leading-5 ${direction === 'across' && active.row === index ? 'bg-amber-100 font-black text-navy' : 'text-slate-700'}`}><span className="mr-2 font-black">{index + 1}.</span>{clue}</button>
             ))}
           </div>
 
           <h2 className="mt-6 text-lg font-black text-navy">Down</h2>
           <div className="mt-2 grid gap-2">
             {CLUES.map((clue, index) => (
-              <button key={`d-${index}`} type="button" onClick={() => { setDirection('down'); setActive({ row: 0, col: index }) }} className={`rounded-xl px-3 py-2 text-left text-sm leading-5 ${direction === 'down' && active.col === index ? 'bg-amber-100 font-black text-navy' : 'text-slate-700'}`}><span className="mr-2 font-black">{index + 1}.</span>{clue}</button>
+              <button key={`d-${index}`} type="button" onClick={() => { setDirection('down'); setActive({ row: 0, col: index }); focusCell(0, index) }} className={`rounded-xl px-3 py-2 text-left text-sm leading-5 ${direction === 'down' && active.col === index ? 'bg-amber-100 font-black text-navy' : 'text-slate-700'}`}><span className="mr-2 font-black">{index + 1}.</span>{clue}</button>
             ))}
           </div>
         </aside>
